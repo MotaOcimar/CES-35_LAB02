@@ -1,8 +1,6 @@
 #include <iostream>
 #include <cstring>
-#include <unistd.h> // read, write, close
-#include <netdb.h> // htons, htonl, listen, accept, sockaddr_in, INADDR_ANY, AF_INET, SOCK_STREAM, IPPROTO_TCP, SOL_SOCKET, SO_REUSEADDR
-#include <sys/fcntl.h> // O_RDONLY
+#include "web-server.h"
 
 #define QUEUE_SIZE 10
 #define BUF_SIZE 4096
@@ -18,7 +16,6 @@ int main(int argc, char *argv[]) {
         exit(-1);
     }
 
-    // Get the host
     char *hostname = argv[1];
     struct hostent *host = gethostbyname(hostname);
     if (!host) {
@@ -38,11 +35,7 @@ int main(int argc, char *argv[]) {
     int port = (int) strtol(argv[2], &pEnd, 10);
 
     // Create a socket address
-    struct sockaddr_in channel{};
-    memset(&channel, 0, sizeof(channel));
-    channel.sin_family = AF_INET;
-    memcpy(&channel.sin_addr.s_addr, host->h_addr, host->h_length);
-    channel.sin_port = htons(port);
+    sockaddr_in channel = createSockaddrByHostAndPort(host, port);
 
     // Binds the address to the socket:
     if (bind(soc_file_descr, (struct sockaddr *) &channel, sizeof(channel)) < 0) {
@@ -65,13 +58,15 @@ int main(int argc, char *argv[]) {
             exit(-1);
         }
 
-        // Read the requested file name to `filename`
-        char file_name[BUF_SIZE];
-        read(accepted_socket, file_name, BUF_SIZE);
+        // Read the request
+        char request[BUF_SIZE];
+        read(accepted_socket, request, BUF_SIZE);
+
+        char *URI = getRequestURI(request);
 
         char *file_location = argv[3];
-        strcat(file_location, "/");
-        strcat(file_location, file_name);
+        removeEndSlash(file_location);
+        strcat(file_location, URI);
 
         // open and read the file
         int file = open(file_location, O_RDONLY);
@@ -82,6 +77,8 @@ int main(int argc, char *argv[]) {
             while ((bytes = read(file, file_location, BUF_SIZE)) > 0){
                 // send the read bytes through the socket connection
                 write(accepted_socket, file_location, bytes);
+                // write on stdout too
+                write(1, file_location, bytes);
             }
             close(file);
         }
