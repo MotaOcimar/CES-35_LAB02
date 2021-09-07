@@ -1,9 +1,10 @@
 #include <iostream>
+#include <string>
 #include <cstring>
 #include <netdb.h>  // gethostbyname, socket, htons, hostent, sockaddr_in, PF_INET, AF_INET, SOCK_STREAM, IPPROTO_TCP
 #include <unistd.h> // write, read
 #include <sstream>
-#include <string>
+#include <fstream>
 
 #define BUFSIZE 4096
 
@@ -30,13 +31,13 @@ int main(int argc, char *argv[]) {
     struct hostent *host = gethostbyname(hostname.c_str());
     if (!host) {
         std::cerr << "gethostbyname failed to locate " << hostname << std::endl;
-        exit(-1);
+        return -1;
     }
 
     int socket_fd = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
     if (socket_fd < 0) {
         std::cerr << "socket call failed" << std::endl;
-        exit(-1);
+        return -1;
     }
 
     struct sockaddr_in channel{};
@@ -49,17 +50,30 @@ int main(int argc, char *argv[]) {
     channel.sin_port = htons(port);
     if (connect(socket_fd, (struct sockaddr *) &channel, sizeof(channel)) < 0) {
         std::cerr << "connect failed" << std::endl;
-        exit(-1);
+        return -1;
     }
 
     std::string filename = s.substr(pos);
-    std::stringstream ss;
     std::string request = "GET " + filename + " HTTP/1.1\r\nHost: " + hostname + "\r\nAccept: text/html\r\n\r\n";
     write(socket_fd, request.c_str(), request.length());
     send(socket_fd, request.c_str(), request.length(), 0);
+    std::stringstream ss;
     int buffer[BUFSIZE];
     long bytes;
-    while ((bytes = read(socket_fd, buffer, BUFSIZE)) > 0)
-        write(STDOUT_FILENO, buffer, bytes);
+    while ((bytes = read(socket_fd, buffer, BUFSIZE)) > 0) {
+        // Only if you want terminal printout. Otherwise, comment the line below
+        // write(STDOUT_FILENO, buffer, bytes);
+        ss.write(reinterpret_cast<const char *>(buffer), bytes);
+    }
+    s = ss.str();
+    pos = s.find("200 OK");
+    if (pos != std::string::npos) {
+        std::cout << "OK" << std::endl;
+        std::ofstream fout(filename.substr(filename.find_last_of('/') + 1, filename.length()));
+        fout << s.substr(s.rfind("<html>"), s.length());
+        fout.close();
+    }
+    else
+        std::cerr << "request failed" << std::endl;
     return 0;
 }
