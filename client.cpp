@@ -2,8 +2,10 @@
 #include <cstring>
 #include <netdb.h>  // gethostbyname, socket, htons, hostent, sockaddr_in, PF_INET, AF_INET, SOCK_STREAM, IPPROTO_TCP
 #include <unistd.h> // write, read
+#include <sstream>
+#include <string>
 
-#define SERVER_PORT 8080
+#define SERVER_PORT 80
 #define BUFSIZE 4096
 
 /* Requests a file from the server program `server.cpp`
@@ -12,20 +14,20 @@
  */
 int main(int argc, char *argv[]) {
     if (argc != 3) {
-        std::cerr << "Usage: client host-name file-name"<<std::endl;
+        std::cerr << "Usage: client host-name file-name" << std::endl;
         exit(-1);
     }
 
     char *hostname = argv[1];
     struct hostent *host = gethostbyname(hostname);
     if (!host) {
-        std::cerr << "gethostbyname failed to locate " << hostname;
+        std::cerr << "gethostbyname failed to locate " << hostname << std::endl;
         exit(-1);
     }
 
-    int soc_file_descr = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
-    if (soc_file_descr < 0) {
-        std::cerr << "socket call failed"<<std::endl;
+    int socket_fd = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
+    if (socket_fd < 0) {
+        std::cerr << "socket call failed" << std::endl;
         exit(-1);
     }
 
@@ -35,17 +37,20 @@ int main(int argc, char *argv[]) {
     memcpy(&channel.sin_addr.s_addr, host->h_addr, host->h_length);
     channel.sin_port = htons(SERVER_PORT);
 
-    if (connect(soc_file_descr, (struct sockaddr *) &channel, sizeof(channel)) < 0) {
-        std::cerr << "connect failed"<<std::endl;
+    if (connect(socket_fd, (struct sockaddr *) &channel, sizeof(channel)) < 0) {
+        std::cerr << "connect failed" << std::endl;
         exit(-1);
     }
 
     char *filename = argv[2];
-    write(soc_file_descr, filename, strlen(filename) + 1);
+    std::stringstream ss;
+    ss << "GET " << filename << " HTTP/1.1\r\nHost: " << hostname << "\r\nAccept: text/html\r\n\r\n";
+    std::string request = ss.str();
+    write(socket_fd, request.c_str(), request.length());
+    send(socket_fd, request.c_str(), request.length(), 0);
     int buffer[BUFSIZE];
     long bytes;
-    while ((bytes = read(soc_file_descr, buffer, BUFSIZE)) > 0)
-        write(1, buffer, bytes);
-
+    while ((bytes = read(socket_fd, buffer, BUFSIZE)) > 0)
+        write(STDOUT_FILENO, buffer, bytes);
     return 0;
 }
