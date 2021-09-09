@@ -68,12 +68,22 @@ int main(int argc, char *argv[]) {
     s = ss.str();
     pos = s.find("200 OK");
     if (pos != std::string::npos) {
-        std::cout << "OK" << std::endl;
+        std::cout << "200 OK" << std::endl;
         std::ofstream fout(filename.substr(filename.find_last_of('/') + 1, filename.length()));
         fout << s.substr(s.rfind("<html>"), s.length());
         fout.close();
+        return 0;
     }
-    else
-        std::cerr << "request failed" << std::endl;
-    return 0;
+    pos = s.find("400 Bad Request");
+    if (pos != std::string::npos) {
+        std::cout << "400 Bad Request" << std::endl;
+        return 0;
+    }
+    pos = s.find("404 Not Found");
+    if (pos != std::string::npos) {
+        std::cout << "404 Not Found" << std::endl;
+        return 0;
+    }
+    return -1;
+
 }
