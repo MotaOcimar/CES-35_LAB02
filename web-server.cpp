@@ -12,7 +12,7 @@
  */
 int main(int argc, char *argv[]) {
     if (argc != 4) {
-        std::cerr << "Usage: web-server host port dir"<<std::endl;
+        std::cerr << "Usage: web-server host port dir" << std::endl;
         exit(-1);
     }
 
@@ -24,9 +24,9 @@ int main(int argc, char *argv[]) {
     }
 
     // Create a socket:
-    int soc_file_descr = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-    if (soc_file_descr < 0) {
-        std::cerr << "socket call failed"<<std::endl;
+    int socket_fd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    if (socket_fd < 0) {
+        std::cerr << "socket call failed" << std::endl;
         exit(-1);
     }
 
@@ -38,50 +38,54 @@ int main(int argc, char *argv[]) {
     sockaddr_in channel = createSockaddrByHostAndPort(host, port);
 
     // Binds the address to the socket:
-    if (bind(soc_file_descr, (struct sockaddr *) &channel, sizeof(channel)) < 0) {
-        std::cerr << "bind failed"<<std::endl;
+    if (bind(socket_fd, (struct sockaddr *) &channel, sizeof(channel)) < 0) {
+        std::cerr << "bind failed" << std::endl;
         exit(-1);
     }
 
     // Prepare the socket to listen connections and limit the queue of incoming connections
-    if (listen(soc_file_descr, QUEUE_SIZE) < 0) {
-        std::cerr << "listen failed"<<std::endl;
+    if (listen(socket_fd, QUEUE_SIZE) < 0) {
+        std::cerr << "listen failed" << std::endl;
         exit(-1);
     }
 
     // Always listening for connections:
+    int response;
     while (true) {
         // Accept a queued connection request and return a new socket descriptor
-        int accepted_socket = accept(soc_file_descr, nullptr, nullptr);
+        int accepted_socket = accept(socket_fd, nullptr, nullptr);
         if (accepted_socket < 0) {
-            std::cerr << "accept failed"<<std::endl;
-            exit(-1);
-        }
+            std::cerr << "accept failed" << std::endl;
+            response = 400;
+        } else {
+            // Read the request
+            char request[BUF_SIZE];
+            read(accepted_socket, request, BUF_SIZE);
 
-        // Read the request
-        char request[BUF_SIZE];
-        read(accepted_socket, request, BUF_SIZE);
+            char *URI = getRequestURI(request);
 
-        char *URI = getRequestURI(request);
+            char *file_location = argv[3];
+            removeEndSlash(file_location);
+            strcat(file_location, URI);
 
-        char *file_location = argv[3];
-        removeEndSlash(file_location);
-        strcat(file_location, URI);
-
-        // open and read the file
-        int file = open(file_location, O_RDONLY);
-        if (file < 0)
-            std::cerr << "open failed"<<std::endl;
-        else {
-            long bytes;
-            while ((bytes = read(file, file_location, BUF_SIZE)) > 0){
-                // send the read bytes through the socket connection
-                write(accepted_socket, file_location, bytes);
-                // write on stdout too
-                write(1, file_location, bytes);
+            // open and read the file
+            int file = open(file_location, O_RDONLY);
+            if (file < 0) {
+                std::cerr << "open failed" << std::endl;
+                response = 404;
+            } else {
+                response = 200;
+                long num_bytes;
+                while ((num_bytes = read(file, file_location, BUF_SIZE)) > 0) {
+                    // Sends the read num_bytes through the socket connection
+                    write(accepted_socket, file_location, num_bytes);
+                    // Also writes to stdout
+                    write(STDOUT_FILENO, file_location, num_bytes);
+                }
+                close(file);
             }
-            close(file);
+
+            close(accepted_socket);
         }
-        close(accepted_socket);
     }
 }
