@@ -23,18 +23,16 @@ For example, you can refer to your own computer as a server using `localhost` as
 ### Building
 To build web-client, please tap:
 ```sh
-g++ -o web-server client.cpp
+g++ -o web-server web-client.cpp
 ```  
 
 ### Usage
 Here is the usage of web-client:
-
 ```sh
 ./web-client http://[hostname]:[port]/[file_name]
 ```
 
 For example, you can have an HTTP GET by:
-
 ```sh
 ./web-client gaia.cs.umass.edu:80/wireshark-labs/HTTP-wireshark-file1.html
 ```
