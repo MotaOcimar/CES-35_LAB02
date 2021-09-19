@@ -30,10 +30,9 @@ std::string getFilenameFromRequest(const char *request) {
     return str;
 }
 
-void ensureEndSlash(char *path) {
-    if (path[strlen(path) - 1] != '/') {
-        strcat(path, "/");
-    }
+void removeEndSlash(char *path) {
+    if (path[strlen(path) - 1] == '/')
+        path[strlen(path) - 1] = '\0';
 }
 
 void listenConnections(int socket_fd, std::string server_directory, int thread_id) {

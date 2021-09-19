@@ -56,7 +56,7 @@ int main(int argc, char *argv[]) {
     }
 
     char *server_directory = argv[3];
-    ensureEndSlash(server_directory);
+    removeEndSlash(server_directory);
     std::cout<<"Serving files on \""<<server_directory<<"\""<<std::endl;
 
     // Create threads
