@@ -23,7 +23,7 @@ For example, you can refer to your own computer as a server using `localhost` as
 ### Building
 To build web-client, please tap:
 ```sh
-g++ -o web-server web-client.cpp
+g++ -o web-client web-client.cpp
 ```  
 
 ### Usage
