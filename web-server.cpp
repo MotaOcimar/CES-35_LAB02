@@ -78,8 +78,9 @@ int main(int argc, char *argv[]) {
                 long num_bytes;
                 while ((num_bytes = read(file, file_location, BUF_SIZE)) > 0) {
                     // Sends the read num_bytes through the socket connection
+                    // TODO: FORMAT OUTPUT
                     write(accepted_socket, file_location, num_bytes);
-                    // Also writes to stdout
+                    // Also writes to stdout, if you want terminal. Otherwise, comment the line below
                     write(STDOUT_FILENO, file_location, num_bytes);
                 }
                 close(file);
