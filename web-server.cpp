@@ -1,8 +1,9 @@
 #include <iostream>
-#include <cstring>
+#include <thread>
 #include "web-server.h"
 
 #define QUEUE_SIZE 10
+#define NUM_THREAD 4
 
 /* Creates a server to receive HTTP requests for files
  * argv[1]: hostname
@@ -29,6 +30,12 @@ int main(int argc, char *argv[]) {
         exit(-1);
     }
 
+    // Allows the socket to be bound to the same address after main exits:
+    int opt = 1;
+    if (setsockopt(socket_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(int)) < 0){
+        std::cerr << "set socket option failed"<<std::endl;
+    }
+
     // Get the port:
     char *pEnd;
     int port = (int) strtol(argv[2], &pEnd, 10);
@@ -48,9 +55,23 @@ int main(int argc, char *argv[]) {
         exit(-1);
     }
 
-    char *file_location = argv[3];
-    removeEndSlash(file_location);
+    char *server_directory = argv[3];
+    ensureEndSlash(server_directory);
+    std::cout<<"Serving files on \""<<server_directory<<"\""<<std::endl;
 
-    listenConnections(socket_fd, file_location);
+    // Create threads
+    std::thread threads[NUM_THREAD];
 
+    // Execute threads
+    for (int i = 0; i < NUM_THREAD; ++i) {
+        threads[i] = std::thread(listenConnections, socket_fd, server_directory, i);
+    }
+
+    // synchronize threads
+    for (auto & thread_ : threads) {
+        thread_.join();
+    }
+
+    close(socket_fd);
+    return 0;
 }

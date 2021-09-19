@@ -4,10 +4,13 @@
 #include <unistd.h> // read, write, close
 #include <netdb.h> // htons, htonl, listen, accept, sockaddr_in, INADDR_ANY, AF_INET, SOCK_STREAM, IPPROTO_TCP, SOL_SOCKET, SO_REUSEADDR
 #include <sys/fcntl.h> // O_RDONLY
-#include<sstream> // ss
+#include <sstream> // ss
+#include <cstring>
+#include <mutex>
 
 #define BUF_SIZE 4096
 
+std::mutex mutex_;
 
 struct sockaddr_in createSockaddrByHostAndPort(hostent *host, int port) {
     struct sockaddr_in channel{};
@@ -18,24 +21,22 @@ struct sockaddr_in createSockaddrByHostAndPort(hostent *host, int port) {
     return channel;
 }
 
-char *getRequestURI(const char *request) {
+std::string getFilenameFromRequest(const char *request) {
     std::istringstream ss(request);
     std::string str;
 
     getline(ss, str, ' '); // "GET"
-    getline(ss, str, ' '); // URI
-    int URI_len = (int) str.length();
-    char *URI = (char *) malloc(URI_len + 1);
-    strcpy(URI, str.c_str());
-    return URI;
+    getline(ss, str, ' '); // filename
+    return str;
 }
 
-void removeEndSlash(char *path) {
-    if (path[strlen(path) - 1] == '/')
-        path[strlen(path) - 1] = '\0';
+void ensureEndSlash(char *path) {
+    if (path[strlen(path) - 1] != '/') {
+        strcat(path, "/");
+    }
 }
 
-void listenConnections(int socket_fd, char *file_location) {
+void listenConnections(int socket_fd, std::string server_directory, int thread_id) {
     // Always listening for connections:
     int response;
     while (true) {
@@ -48,28 +49,28 @@ void listenConnections(int socket_fd, char *file_location) {
             // Read the request
             char request[BUF_SIZE];
             read(accepted_socket, request, BUF_SIZE);
-
-            char *URI = getRequestURI(request);
-            strcat(file_location, URI);
+            std::string file_location = server_directory + getFilenameFromRequest(request);
 
             // open and read the file
-            int file = open(file_location, O_RDONLY);
+            mutex_.lock();
+            int file = open(file_location.c_str(), O_RDONLY);
             if (file < 0) {
-                std::cerr << "open failed" << std::endl;
+                std::cerr << "open "<<file_location<<" failed" << std::endl;
                 response = 404;
             } else {
                 response = 200;
                 long num_bytes;
-                while ((num_bytes = read(file, file_location, BUF_SIZE)) > 0) {
+                while ((num_bytes = read(file, (char *) file_location.c_str(), BUF_SIZE)) > 0) {
+                    std::cout<<"Response by thread "<<thread_id<< std::endl;
                     // Sends the read num_bytes through the socket connection
                     // TODO: FORMAT OUTPUT
-                    write(accepted_socket, file_location, num_bytes);
-                    // Also writes to stdout, if you want terminal. Otherwise, comment the line below
-                    write(STDOUT_FILENO, file_location, num_bytes);
+                    write(accepted_socket, file_location.c_str(), num_bytes);
+                    // Also writes to stdout, if you want. Otherwise, comment the line below
+                    // write(STDOUT_FILENO, server_directory, num_bytes);
                 }
                 close(file);
             }
-
+            mutex_.unlock();
             close(accepted_socket);
         }
     }
