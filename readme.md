@@ -2,7 +2,7 @@
 ## Building
 To build web-client, please tap:
 
-`g++ -o web-server client.cpp`
+`g++ -o web-client web-client.cpp`
 ## Usage
 Here is the usage of web-client:
 
