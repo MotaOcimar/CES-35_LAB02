@@ -3,7 +3,6 @@
 #include "web-server.h"
 
 #define QUEUE_SIZE 10
-#define BUF_SIZE 4096
 
 /* Creates a server to receive HTTP requests for files
  * argv[1]: hostname
@@ -49,44 +48,9 @@ int main(int argc, char *argv[]) {
         exit(-1);
     }
 
-    // Always listening for connections:
-    int response;
-    while (true) {
-        // Accept a queued connection request and return a new socket descriptor
-        int accepted_socket = accept(socket_fd, nullptr, nullptr);
-        if (accepted_socket < 0) {
-            std::cerr << "accept failed" << std::endl;
-            response = 400;
-        } else {
-            // Read the request
-            char request[BUF_SIZE];
-            read(accepted_socket, request, BUF_SIZE);
+    char *file_location = argv[3];
+    removeEndSlash(file_location);
 
-            char *URI = getRequestURI(request);
+    listenConnections(socket_fd, file_location);
 
-            char *file_location = argv[3];
-            removeEndSlash(file_location);
-            strcat(file_location, URI);
-
-            // open and read the file
-            int file = open(file_location, O_RDONLY);
-            if (file < 0) {
-                std::cerr << "open failed" << std::endl;
-                response = 404;
-            } else {
-                response = 200;
-                long num_bytes;
-                while ((num_bytes = read(file, file_location, BUF_SIZE)) > 0) {
-                    // Sends the read num_bytes through the socket connection
-                    // TODO: FORMAT OUTPUT
-                    write(accepted_socket, file_location, num_bytes);
-                    // Also writes to stdout, if you want terminal. Otherwise, comment the line below
-                    write(STDOUT_FILENO, file_location, num_bytes);
-                }
-                close(file);
-            }
-
-            close(accepted_socket);
-        }
-    }
 }
