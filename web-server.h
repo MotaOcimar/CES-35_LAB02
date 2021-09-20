@@ -38,16 +38,13 @@ void removeEndSlash(char *path) {
 
 void listenConnections(int socket_fd, std::string server_directory, int thread_id) {
     // Always listening for connections:
-    int response;
     while (true) {
         // Accept a queued connection request and return a new socket descriptor
         int accepted_socket = accept(socket_fd, nullptr, nullptr);
         if (accepted_socket < 0) {
             std::string s = "HTTP/1.0 400 Bad Request\r\n";
             write(accepted_socket, s.c_str(), s.size());
-            // std::cerr << "open "<< file_location <<" failed" << std::endl;
             std::cerr << "accept failed" << std::endl;
-            response = 400;
         } else {
             // Read the request
             char request[BUF_SIZE];
@@ -65,14 +62,12 @@ void listenConnections(int socket_fd, std::string server_directory, int thread_i
             } else {
                 int file = open(file_location.c_str(), O_RDONLY);
                 if (file < 0) {
-                    std::string s = "HTTP/1.0 404 Not Found\r\n";
-                    write(accepted_socket, s.c_str(), s.size());
+                    std::string status = "HTTP/1.0 404 Not Found\r\n";
+                    write(accepted_socket, status.c_str(), status.size());
                     std::cerr << "open " << file_location << " failed" << std::endl;
-                    response = 404;
                 } else {
-                    std::string s = "HTTP/1.0 200 OK\r\n\r\n";
-                    write(accepted_socket, s.c_str(), s.size());
-                    response = 200;
+                    std::string aux_str = "HTTP/1.0 200 OK\r\n\r\n";
+                    write(accepted_socket, aux_str.c_str(), aux_str.size());
                     long num_bytes;
                     char buffer[BUF_SIZE];
                     while ((num_bytes = read(file, buffer, BUF_SIZE)) > 0) {
@@ -80,10 +75,10 @@ void listenConnections(int socket_fd, std::string server_directory, int thread_i
                         // Sends the read num_bytes through the socket connection
                         write(accepted_socket, buffer, num_bytes);
                         // Also writes to stdout, if you want. Otherwise, comment the line below
-                        // write(STDOUT_FILENO, server_directory, num_bytes);
+                        // write(STDOUT_FILENO, buffer, num_bytes);
                     }
-                    s = "\r\n";
-                    write(accepted_socket, s.c_str(), s.size());
+                    aux_str = "\r\n";
+                    write(accepted_socket, aux_str.c_str(), aux_str.size());
                     close(file);
                 }
             }
