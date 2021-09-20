@@ -62,7 +62,7 @@ int main(int argc, char *argv[]) {
     long bytes;
     while ((bytes = read(socket_fd, buffer, BUFSIZE)) > 0) {
         // Only if you want terminal printout. Otherwise, comment the line below
-        // write(STDOUT_FILENO, buffer, bytes);
+        write(STDOUT_FILENO, buffer, bytes);
         ss.write(reinterpret_cast<const char *>(buffer), bytes);
     }
     s = ss.str();
@@ -70,7 +70,7 @@ int main(int argc, char *argv[]) {
     if (pos != std::string::npos) {
         std::cout << "200 OK" << std::endl;
         std::ofstream fout(filename.substr(filename.find_last_of('/') + 1, filename.length()));
-        fout << s.substr(s.rfind("<html>"), s.length());
+        fout << s.substr(s.find("\r\n\r\n") + 4, s.length());
         fout.close();
         return 0;
     }
@@ -85,5 +85,4 @@ int main(int argc, char *argv[]) {
         return 0;
     }
     return -1;
-
 }

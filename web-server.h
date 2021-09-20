@@ -7,6 +7,8 @@
 #include <sstream> // ss
 #include <cstring>
 #include <mutex>
+#include <fstream>
+
 
 #define BUF_SIZE 4096
 
@@ -42,6 +44,8 @@ void listenConnections(int socket_fd, std::string server_directory, int thread_i
         // Accept a queued connection request and return a new socket descriptor
         int accepted_socket = accept(socket_fd, nullptr, nullptr);
         if (accepted_socket < 0) {
+            std::string s = "HTTP/1.0 400 Bad Request\r\n";
+            write(accepted_socket, s.c_str(), s.size());
             std::cerr << "accept failed" << std::endl;
             response = 400;
         } else {
@@ -52,22 +56,42 @@ void listenConnections(int socket_fd, std::string server_directory, int thread_i
 
             // open and read the file
             mutex_.lock();
-            int file = open(file_location.c_str(), O_RDONLY);
-            if (file < 0) {
+            std::cout << file_location << std::endl;
+            std::ifstream fin(file_location.c_str());
+            // int file = open(file_location.c_str(), O_RDONLY);
+            fin.seekg(0, std::ios::end);
+            if (!fin.good()) {
+                std::string s = "HTTP/1.0 404 Not Found\r\n";
+                write(accepted_socket, s.c_str(), s.size());
                 std::cerr << "open "<<file_location<<" failed" << std::endl;
                 response = 404;
-            } else {
+            }
+            else {
                 response = 200;
                 long num_bytes;
-                while ((num_bytes = read(file, (char *) file_location.c_str(), BUF_SIZE)) > 0) {
+                std::string s = "HTTP/1.0 200 OK\r\n\r\n";
+                write(accepted_socket, s.c_str(), s.size());
+                char buffer[BUF_SIZE];
+                fin.getline(buffer, BUF_SIZE);//(fin.rdstate() & std::ifstream::failbit) != 0
+                char c;
+                fin.get(c);
+                std::cout << "reached!!!!!!" << fin.eof() << std::endl;
+                while (!fin.eof()) {
+                // while (getline(buffer, BUF_SIZE,fin)) {
                     std::cout<<"Response by thread "<<thread_id<< std::endl;
                     // Sends the read num_bytes through the socket connection
-                    // TODO: FORMAT OUTPUT
-                    write(accepted_socket, file_location.c_str(), num_bytes);
+                    buffer[0] = c;
+                    buffer[1] = '\0';
+                    write(accepted_socket, buffer, num_bytes);
                     // Also writes to stdout, if you want. Otherwise, comment the line below
-                    // write(STDOUT_FILENO, server_directory, num_bytes);
+                    fin.get(c);
+                    //std::cout << buffer;
+                    // write(STDOUT_FILENO, buffer, num_bytes);
+                    // fin.read(buffer, BUF_SIZE);
                 }
-                close(file);
+                s = "\r\n";
+                write(accepted_socket, s.c_str(), s.size());
+                fin.close();
             }
             mutex_.unlock();
             close(accepted_socket);
