@@ -7,6 +7,7 @@
 #include <sstream> // ss
 #include <cstring>
 #include <mutex>
+#include <sys/stat.h>
 
 #define BUF_SIZE 4096
 
@@ -55,28 +56,36 @@ void listenConnections(int socket_fd, std::string server_directory, int thread_i
 
             // open and read the file
             mutex_.lock();
-            int file = open(file_location.c_str(), O_RDONLY);
-            if (file < 0) {
-                std::string s = "HTTP/1.0 404 Not Found\r\n";
-                write(accepted_socket, s.c_str(), s.size());
-                std::cerr << "open "<< file_location <<" failed" << std::endl;
-                response = 404;
+            struct stat path_stat{};
+            stat(file_location.c_str(), &path_stat);
+            if (!S_ISREG(path_stat.st_mode)){
+                std::string status = "HTTP/1.0 404 Not Found\r\n";
+                write(accepted_socket, status.c_str(), status.size());
+                std::cerr << "open "<<file_location<<" failed" << std::endl;
             } else {
-                std::string s = "HTTP/1.0 200 OK\r\n\r\n";
-                write(accepted_socket, s.c_str(), s.size());
-                response = 200;
-                long num_bytes;
-                char buffer[BUF_SIZE];
-                while ((num_bytes = read(file, buffer, BUF_SIZE)) > 0) {
-                    // std::cout<<"Response by thread "<<thread_id<< std::endl;
-                    // Sends the read num_bytes through the socket connection
-                    write(accepted_socket, buffer, num_bytes);
-                    // Also writes to stdout, if you want. Otherwise, comment the line below
-                    // write(STDOUT_FILENO, server_directory, num_bytes);
+                int file = open(file_location.c_str(), O_RDONLY);
+                if (file < 0) {
+                    std::string s = "HTTP/1.0 404 Not Found\r\n";
+                    write(accepted_socket, s.c_str(), s.size());
+                    std::cerr << "open " << file_location << " failed" << std::endl;
+                    response = 404;
+                } else {
+                    std::string s = "HTTP/1.0 200 OK\r\n\r\n";
+                    write(accepted_socket, s.c_str(), s.size());
+                    response = 200;
+                    long num_bytes;
+                    char buffer[BUF_SIZE];
+                    while ((num_bytes = read(file, buffer, BUF_SIZE)) > 0) {
+                        // std::cout<<"Response by thread "<<thread_id<< std::endl;
+                        // Sends the read num_bytes through the socket connection
+                        write(accepted_socket, buffer, num_bytes);
+                        // Also writes to stdout, if you want. Otherwise, comment the line below
+                        // write(STDOUT_FILENO, server_directory, num_bytes);
+                    }
+                    s = "\r\n";
+                    write(accepted_socket, s.c_str(), s.size());
+                    close(file);
                 }
-                s = "\r\n";
-                write(accepted_socket, s.c_str(), s.size());
-                close(file);
             }
             mutex_.unlock();
             close(accepted_socket);
