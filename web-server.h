@@ -42,6 +42,9 @@ void listenConnections(int socket_fd, std::string server_directory, int thread_i
         // Accept a queued connection request and return a new socket descriptor
         int accepted_socket = accept(socket_fd, nullptr, nullptr);
         if (accepted_socket < 0) {
+            std::string s = "HTTP/1.0 400 Bad Request\r\n";
+            write(accepted_socket, s.c_str(), s.size());
+            // std::cerr << "open "<< file_location <<" failed" << std::endl;
             std::cerr << "accept failed" << std::endl;
             response = 400;
         } else {
@@ -54,19 +57,25 @@ void listenConnections(int socket_fd, std::string server_directory, int thread_i
             mutex_.lock();
             int file = open(file_location.c_str(), O_RDONLY);
             if (file < 0) {
-                std::cerr << "open "<<file_location<<" failed" << std::endl;
+                std::string s = "HTTP/1.0 404 Not Found\r\n";
+                write(accepted_socket, s.c_str(), s.size());
+                std::cerr << "open "<< file_location <<" failed" << std::endl;
                 response = 404;
             } else {
+                std::string s = "HTTP/1.0 200 OK\r\n\r\n";
+                write(accepted_socket, s.c_str(), s.size());
                 response = 200;
                 long num_bytes;
-                while ((num_bytes = read(file, (char *) file_location.c_str(), BUF_SIZE)) > 0) {
-                    std::cout<<"Response by thread "<<thread_id<< std::endl;
+                char buffer[BUF_SIZE];
+                while ((num_bytes = read(file, buffer, BUF_SIZE)) > 0) {
+                    // std::cout<<"Response by thread "<<thread_id<< std::endl;
                     // Sends the read num_bytes through the socket connection
-                    // TODO: FORMAT OUTPUT
-                    write(accepted_socket, file_location.c_str(), num_bytes);
+                    write(accepted_socket, buffer, num_bytes);
                     // Also writes to stdout, if you want. Otherwise, comment the line below
                     // write(STDOUT_FILENO, server_directory, num_bytes);
                 }
+                s = "\r\n";
+                write(accepted_socket, s.c_str(), s.size());
                 close(file);
             }
             mutex_.unlock();
